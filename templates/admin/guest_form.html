@@ -1,0 +1,143 @@
+{# templates/admin/guest_form.html #}
+{% extends "base.html" %}
+
+{% block title %}
+    {% if form_action == 'add' %}Adicionar Novo Grupo{% else %}Editar Grupo{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        {% if form_action == 'add' %}Adicionar Novo Grupo de Convidados{% else %}Editar Grupo de Convidados{% endif %}
+    </h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-3">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{% if form_action == 'add' %}{{ url_for('admin_add_guest') }}{% else %}{{ url_for('admin_edit_guest', guest_id=guest.id) }}{% endif %}">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                Detalhes do Grupo
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="group_name" class="form-label">Nome do Grupo (Ex: Família Silva)</label>
+                    <input type="text" class="form-control" id="group_name" name="group_name" value="{{ guest.group_name if guest else '' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="party_type" class="form-label">Tipo de Festa</label>
+                    <select class="form-select" id="party_type" name="party_type" required>
+                        <option value="talita_joaquim" {% if guest and guest.party_type == 'talita_joaquim' %}selected{% endif %}>
+                            Festa Talita & Joaquim (30/08)
+                        </option>
+                        <option value="talita_29_08" {% if guest and guest.party_type == 'talita_29_08' %}selected{% endif %}>
+                            Festa da Talita (29/08)
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                Membros do Grupo
+            </div>
+            <div class="card-body" id="members-container">
+                <p class="form-text">Adicione os nomes dos membros. Para cada membro principal, inclua uma linha.</p>
+                {% if members %}
+                    {% for member in members %}
+                    <div class="input-group mb-2 member-row">
+                        <input type="hidden" name="member_id" value="{{ member.id }}">
+                        <input type="text" class="form-control" name="member_name" placeholder="Nome Completo do Membro" value="{{ member.name }}" required>
+                        <div class="input-group-text">
+                            <input class="form-check-input mt-0" type="checkbox" name="is_confirmed" value="{{ member.id }}" {% if member.is_confirmed %}checked{% endif %} title="Confirmado?">
+                            <label class="form-check-label ms-2">Conf.</label>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger remove-member-btn">Remover</button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+                <button type="button" class="btn btn-outline-secondary" id="add-member-btn">
+                    <i class="bi bi-plus-circle me-2"></i> Adicionar Membro
+                </button>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                Acompanhante Extra (Plus One)
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="plus_one_name" class="form-label">Nome do Acompanhante Extra (se houver)</label>
+                    <input type="text" class="form-control" id="plus_one_name" name="plus_one_name" value="{{ plus_one_name if plus_one_name else '' }}" placeholder="Nome completo do acompanhante">
+                    <div class="form-text">Este campo é para um convidado adicional não listado previamente.</div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">
+            {% if form_action == 'add' %}Salvar Grupo{% else %}Atualizar Grupo{% endif %}
+        </button>
+        <a href="{{ url_for('admin_guests') }}" class="btn btn-secondary btn-lg ms-2">Cancelar</a>
+    </form>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const membersContainer = document.getElementById('members-container');
+        const addMemberBtn = document.getElementById('add-member-btn');
+
+        function addMemberRow(name = '', isConfirmed = false) {
+            const memberRow = document.createElement('div');
+            memberRow.classList.add('input-group', 'mb-2', 'member-row');
+            memberRow.innerHTML = `
+                <input type="hidden" name="member_id" value="new"> {# Indica que é um novo membro #}
+                <input type="text" class="form-control" name="member_name" placeholder="Nome Completo do Membro" value="${name}" required>
+                <div class="input-group-text">
+                    <input class="form-check-input mt-0" type="checkbox" name="is_confirmed" value="new_member_id" ${isConfirmed ? 'checked' : ''} title="Confirmado?">
+                    <label class="form-check-label ms-2">Conf.</label>
+                </div>
+                <button type="button" class="btn btn-outline-danger remove-member-btn">Remover</button>
+            `;
+            membersContainer.insertBefore(memberRow, addMemberBtn);
+            // Adiciona listener para o novo botão de remover
+            memberRow.querySelector('.remove-member-btn').addEventListener('click', function() {
+                memberRow.remove();
+            });
+            // Atualiza o valor do checkbox para ser o ID dinâmico ou 'new_member_id'
+            memberRow.querySelector('input[name="is_confirmed"]').value = 'new_member_' + Date.now();
+        }
+
+        addMemberBtn.addEventListener('click', () => addMemberRow());
+
+        // Adiciona listeners para os botões de remover existentes ao carregar a página
+        document.querySelectorAll('.remove-member-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                this.closest('.member-row').remove();
+            });
+        });
+
+        // Atualiza os valores dos checkboxes dos membros existentes para serem seus IDs
+        document.querySelectorAll('.member-row input[name="member_id"]').forEach(input => {
+            const memberId = input.value;
+            if (memberId !== 'new') { // Apenas para membros existentes
+                 const checkbox = input.closest('.member-row').querySelector('input[name="is_confirmed"]');
+                 if (checkbox) {
+                     checkbox.value = memberId;
+                 }
+            }
+        });
+
+    });
+</script>
+{% endblock %}

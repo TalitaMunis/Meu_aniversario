@@ -1,0 +1,76 @@
+{# templates/admin/venue_photo_add.html #} {% extends "base.html" %} {% block
+title %}Adicionar Foto do Local{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h1 class="mb-4">Adicionar Nova Foto do Local da Festa</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %} {% if
+  messages %}
+  <div class="mb-3">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %} {% endwith %}
+
+  <form
+    method="POST"
+    action="{{ url_for('admin_add_venue_photo') }}"
+    enctype="multipart/form-data"
+  >
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">Detalhes da Foto</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="photo_file" class="form-label">Arquivo da Foto</label>
+          <input
+            type="file"
+            class="form-control"
+            id="photo_file"
+            name="photo_file"
+            accept="image/*"
+            required
+          />
+          <div class="form-text">
+            Selecione um arquivo de imagem (PNG, JPG, JPEG, GIF).
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label"
+            >Descrição (opcional)</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="description"
+            name="description"
+            placeholder="Ex: Vista da Piscina"
+          />
+          <div class="form-text">Uma breve descrição para a foto.</div>
+        </div>
+        <div class="mb-3">
+          <label for="order" class="form-label">Ordem de Exibição</label>
+          <input
+            type="number"
+            class="form-control"
+            id="order"
+            name="order"
+            value="0"
+            min="0"
+          />
+          <div class="form-text">
+            Define a ordem em que as fotos aparecerão na galeria (menor número
+            aparece primeiro).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">Salvar Foto</button>
+    <a
+      href="{{ url_for('admin_venue_photos') }}"
+      class="btn btn-secondary btn-lg ms-2"
+      >Cancelar</a
+    >
+  </form>
+</div>
+{% endblock %}

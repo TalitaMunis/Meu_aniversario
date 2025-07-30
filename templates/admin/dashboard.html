@@ -1,0 +1,78 @@
+{# templates/admin/dashboard.html #} {% extends "base.html" %} {% block title
+%}Dashboard Admin{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h1 class="mb-4">Bem-vindo(a) ao Dashboard do Administrador!</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %} {% if
+  messages %}
+  <div class="mb-3">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %} {% endwith %}
+
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <i class="bi bi-gear-fill display-4 text-primary mb-3"></i>
+          <h5 class="card-title">Configurações do Convite</h5>
+          <p class="card-text">
+            Altere textos, datas, locais e a imagem principal do convite.
+          </p>
+          <a href="{{ url_for('admin_settings') }}" class="btn btn-primary"
+            >Acessar Configurações</a
+          >
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <i class="bi bi-people-fill display-4 text-success mb-3"></i>
+          <h5 class="card-title">Gerenciar Convidados</h5>
+          <p class="card-text">
+            Adicione, edite ou remova grupos de convidados e veja o status de
+            RSVP.
+          </p>
+          <a href="{{ url_for('admin_guests') }}" class="btn btn-success"
+            >Gerenciar Convidados</a
+          >
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <i class="bi bi-images display-4 text-info mb-3"></i>
+          <h5 class="card-title">Gerenciar Mídias</h5>
+          <p class="card-text">
+            Visualize e baixe fotos e vídeos enviados pelos convidados.
+          </p>
+          <a href="{{ url_for('admin_media') }}" class="btn btn-info"
+            >Gerenciar Mídias</a
+          >
+        </div>
+      </div>
+    </div>
+    {# NOVO CARD PARA FOTOS DO LOCAL #}
+    <div class="col-md-4 mb-3">
+      <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+          <i class="bi bi-camera display-4 text-secondary mb-3"></i>
+          <h5 class="card-title">Gerenciar Fotos do Local</h5>
+          <p class="card-text">
+            Adicione ou remova fotos da galeria do local da festa.
+          </p>
+          <a
+            href="{{ url_for('admin_venue_photos') }}"
+            class="btn btn-secondary"
+            >Gerenciar Fotos ({{ total_venue_photos }})</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

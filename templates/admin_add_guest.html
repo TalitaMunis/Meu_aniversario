@@ -1,0 +1,65 @@
+{% extends "base.html" %} {% block title %}Adicionar Convidado{% endblock %} {%
+block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header text-center">
+        <h3>Adicionar Novo Grupo de Convidados</h3>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_add_guest') }}">
+          <div class="mb-3">
+            <label for="group_name" class="form-label"
+              >Nome do Grupo/Família</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="group_name"
+              name="group_name"
+              placeholder="Ex: Família Silva, Amigos do Trabalho"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="party_type" class="form-label">Para qual festa?</label>
+            <select
+              class="form-select"
+              id="party_type"
+              name="party_type"
+              required
+            >
+              <option value="talita_joaquim">
+                Aniversário Talita & Joaquim (30/08)
+              </option>
+              <option value="talita_29_08">Festa da Talita (29/08)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="member_names" class="form-label"
+              >Nomes dos Membros (separados por vírgula)</label
+            >
+            <textarea
+              class="form-control"
+              id="member_names"
+              name="member_names"
+              rows="3"
+              placeholder="Ex: Talita, Joaquim, Maria, Pedro"
+              required
+            ></textarea>
+            <div class="form-text">
+              Digite os nomes completos dos membros deste grupo, separados por
+              vírgula.
+            </div>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">
+              Adicionar Grupo
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

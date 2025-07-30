@@ -1,0 +1,480 @@
+/* Importar fontes do Google Fonts */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Quicksand:wght@400;500;700&family=Tangerine:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lobster&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Updock&display=swap");
+/* --- Estilos Gerais --- */
+body {
+  font-family: "Quicksand", sans-serif; /* Fonte amigável para o corpo */
+  background-color: #eaf2f8; /* Fundo suave: Azul Muito Claro */
+  color: black; /* Cor de texto padrão: Cinza Escuro */
+  line-height: 1.6;
+  /* Toque sutil de natureza/tecnologia no background */
+  background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23bbdefb' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 0h3v3H0V0zm3 3h3v3H3V3z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* --- Títulos --- */
+h1,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Montserrat", sans-serif; /* Fonte forte para títulos */
+  color: #0d47a1; /* Azul Principal para títulos */
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+}
+
+/* --- Links --- */
+a {
+  color: #1976d2; /* Azul Secundário para links */
+  text-decoration: none;
+  transition: color 0.3s ease; /* Transição suave para links */
+}
+
+a:hover {
+  color: #0d47a1; /* Azul Principal no hover */
+  text-decoration: underline;
+}
+
+/* --- Seções e Cards --- */
+.container {
+  background-color: #ffffff; /* Fundo do conteúdo principal: Branco */
+  padding: 30px;
+  border-radius: 12px; /* Mais arredondado para toque meigo/moderno */
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.1); /* Sombra mais pronunciada */
+}
+
+.card {
+  border: none;
+  border-radius: 10px; /* Mais arredondado */
+  box-shadow: 0 3px 15px rgba(0, 0, 0, 0.08); /* Sombra mais pronunciada */
+  transition: transform 0.3s ease; /* Transição para efeito no hover */
+}
+
+.card:hover {
+  transform: translateY(-5px); /* Leve levantamento no hover para os cards */
+}
+
+/* Cores dos cards de resumo no admin dashboard */
+.card.bg-primary {
+  background-color: #1976d2 !important;
+} /* Azul Secundário */
+.card.bg-success {
+  background-color: #0d47a1 !important;
+} /* Azul Principal (para confirmado) */
+.card.bg-warning {
+  background-color: #6c757d !important;
+  color: #ffffff !important;
+} /* Cinza Médio para não confirmado */
+.card.bg-info {
+  background-color: #eaf2f8 !important;
+  color: #333333 !important;
+} /* Azul Muito Claro para info, com texto escuro */
+.card.bg-secondary {
+  background-color: #333333 !important;
+} /* Cinza Escuro */
+
+/* --- Botões --- */
+.btn {
+  border-radius: 50px; /* Botões mais arredondados (pílula) */
+  font-weight: 700; /* Texto mais forte */
+  padding: 10px 25px;
+  transition: all 0.3s ease; /* Transição suave para todos os botões */
+}
+
+.btn-primary {
+  background-color: #1976d2; /* Botão principal: Azul Secundário */
+  border-color: #1976d2;
+}
+.btn-primary:hover {
+  background-color: #0d47a1; /* Azul Principal no hover */
+  border-color: #0d47a1;
+  box-shadow: 0 5px 15px rgba(25, 118, 210, 0.3); /* Sombra no hover */
+}
+
+.btn-success {
+  /* Botão para adicionar convidados no admin */
+  background-color: #0d47a1; /* Azul Principal */
+  border-color: #0d47a1;
+}
+.btn-success:hover {
+  background-color: #1976d2; /* Azul Secundário no hover */
+  border-color: #1976d2;
+  box-shadow: 0 5px 15px rgba(13, 71, 161, 0.3);
+}
+
+.btn-danger {
+  /* Botão Sair no admin */
+  background-color: #dc3545; /* Vermelho padrão para ação perigosa */
+  border-color: #dc3545;
+}
+.btn-danger:hover {
+  background-color: #c82333;
+  border-color: #c82333;
+}
+
+/* --- Seção de Boas-Vindas Principal (confirm.html) --- */
+.welcome-section {
+  /* Nova classe para a div .text-center.mb-5 */
+  background: linear-gradient(135deg, #eaf2f8 0%, #bbdefb 100%);
+  border-radius: 12px;
+  color: #333333;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  font-family: "Doca";
+  text-align: center;
+  padding: 5px 5px 20px 5px;
+}
+
+/* Ajustes para a foto na seção de boas-vindas - RETANGULAR E MAIOR */
+.welcome-section .welcome-image {
+  width: 80%; /* Ocupa 80% da largura do container pai */
+  max-width: 600px; /* Limita o tamanho máximo da imagem */
+  height: auto; /* Mantém a proporção da imagem automaticamente */
+  object-fit: cover;
+  border: 6px solid #1976d2;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* Estilo elegante para os textos da seção de boas-vindas */
+.welcome-section .welcome-title {
+  /* H1 "Celebre Conosco!" */
+  color: #0d47a1 !important;
+  font-size: 3.5em;
+  margin: 30px 5px 45px 5px;
+  font-family: "Lobster", sans-serif;
+  font-weight: 400;
+}
+
+.welcome-section .welcome-message {
+  /* P "Estamos muito felizes em..." */
+  color: #424242 !important;
+  font-size: 1.8rem; /* Ajuste para fonte Tangerine */
+  line-height: 1.5;
+  font-family: "Doca";
+  margin: 45px auto;
+}
+
+/* NOVO: Estilo para o Símbolo de União (estrutura .union-symbol que você tem) */
+.union-symbol {
+  font-family: "Doca";
+  font-weight: 500;
+  color: #0d47a1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1; /* Reduz espaçamento entre as linhas do símbolo */
+}
+
+.union-symbol .initials {
+  margin: 0 0 45px 0;
+  font-size: 5rem; /* Tamanho grande para as iniciais com Tangerine */
+  line-height: 1;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(45deg, #0d47a1, #1976d2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.union-symbol .initials i {
+  font-size: 0.8em;
+  margin: 0 5px;
+}
+
+.union-symbol .ages {
+  font-size: 2.5rem;
+  color: #6c757d;
+  margin-top: 5px;
+  letter-spacing: 0.1em;
+}
+
+/* --- Seção "Detalhes da Festa" --- */
+.party-details-section {
+  background-color: #f5f5f5;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+  border-left: 5px solid #0d47a1;
+}
+
+.party-details-section p {
+  margin-bottom: 8px;
+}
+
+/* --- Elementos de Formulário --- */
+.form-control,
+.form-select {
+  border-radius: 8px;
+  border: 1px solid #bbdefb;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 10px 15px;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 0.25rem rgba(25, 118, 210, 0.25);
+}
+
+.form-check-input:checked {
+  background-color: #0d47a1;
+  border-color: #0d47a1;
+}
+
+.form-check-label {
+  font-weight: 500;
+  color: #424242;
+  font-size: 1.2em;
+}
+
+.mb-3 {
+  font-size: 1.2em;
+}
+
+/* Centralizar labels de upload de fotos/vídeos */
+.form-label.text-center-label {
+  display: block;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.form-text {
+  font-size: 0.95em;
+  color: #6c757d;
+}
+
+/* --- Links de Localização (após os detalhes da festa) --- */
+.text-decoration-none {
+  color: #1976d2 !important;
+  font-weight: 700;
+}
+.text-decoration-none:hover {
+  color: #0d47a1 !important;
+}
+
+/* --- Mensagens Flash --- */
+.alert {
+  border-radius: 8px;
+  padding: 15px 20px;
+  font-weight: 500;
+  font-size: 0.95em;
+}
+
+.map-responsive {
+  overflow: hidden;
+  padding-bottom: 56.25%;
+  position: relative;
+  height: 0;
+}
+
+.map-responsive iframe {
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  border-radius: 8px;
+}
+
+/* Refinamento para títulos dentro de cards */
+.card-title {
+  color: #0d47a1;
+  font-size: 1.75rem;
+  margin-bottom: 1em;
+  padding-bottom: 0.5em;
+  border-bottom: 2px solid #eaf2f8;
+  position: relative;
+  text-align: center;
+}
+/* Ajuste para parágrafos dentro de cards */
+.card-text {
+  margin-bottom: 1.5em;
+  font-size: 1.2em;
+}
+
+/* Estilos para a seção de fotos do local no confirm.html */
+.venue-photos-section h4 {
+  color: #0d47a1;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-family: "Montserrat", sans-serif;
+  font-size: 2rem;
+}
+
+.venue-photo-img {
+  height: 450px; /* Aumentado para notebooks e desktops */
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo para as miniaturas de foto do local no admin/venue_photos.html */
+.venue-admin-img {
+  height: 150px;
+  object-fit: cover;
+  border-top-left-radius: calc(0.25rem - 1px);
+  border-top-right-radius: calc(0.25rem - 1px);
+}
+
+/* Ajustes gerais para carrossel */
+.carousel-caption {
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+  padding: 0.5rem 1rem;
+  bottom: 20px;
+}
+
+.carousel-caption h5 {
+  color: #ffffff;
+  font-size: 1.25rem;
+  margin-bottom: 0;
+}
+
+/* NOVO: Destaque para o texto "Temos fotos juntos?" */
+.card-text.highlight-text {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #0d47a1;
+  text-shadow: 0.5px 0.5px 1px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5em;
+  text-align: center;
+}
+
+/* --- Links e Navegação --- */
+a {
+  color: #1976d2; /* Azul Secundário para links */
+  text-decoration: none;
+  transition: color 0.3s ease; /* Transição suave para links */
+}
+
+a:hover {
+  color: #0d47a1; /* Azul Principal no hover */
+  text-decoration: underline;
+}
+
+.navbar {
+  background-color: #0d47a1 !important; /* Barra de navegação: Azul Principal */
+  border-bottom: 3px solid #1976d2; /* Uma linha Azul Secundário para detalhe */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* ALtere AQUI para a cor dos textos principais da barra de navegação */
+.navbar-brand,
+.nav-link {
+  color: #0d47a1 !important; /* Exemplo: Um verde claro para os textos */
+  transition: color 0.3s ease;
+}
+
+/* ALtere AQUI para a cor dos textos ao passar o mouse */
+.navbar-brand:hover,
+.nav-link:hover {
+  color: #1976d2 !important; /* Exemplo: Branco no hover */
+}
+
+/* Estilos para itens de dropdown - se você quiser mudá-los */
+.dropdown-menu {
+  background-color: #f8f9fa; /* Cor de fundo do menu dropdown */
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.25rem;
+}
+
+.dropdown-item {
+  color: #333333; /* Cor do texto dos itens do dropdown */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: #e9ecef; /* Cor de fundo no hover do item */
+  color: #0d47a1; /* Cor do texto no hover do item */
+}
+
+/* Adaptação para telas menores no carrossel */
+@media (max-width: 767px) {
+  .venue-photo-img {
+    height: 280px; /* Ajustado para telas menores também */
+  }
+  .carousel-caption {
+    padding: 0.25rem 0.5rem;
+    bottom: 10px;
+  }
+  .carousel-caption h5 {
+    font-size: 1rem;
+  }
+}
+
+/* --- Desktop Responsiveness / Large Screens Optimization --- */
+@media (min-width: 1200px) {
+  .container {
+    max-width: 700px;
+  }
+  body {
+    font-size: 1.05rem;
+  }
+  h1 {
+    font-size: 3rem;
+  }
+  h3 {
+    font-size: 1.8rem;
+  }
+  .welcome-section {
+    padding: 40px 0;
+  }
+
+  .card {
+    padding: 30px;
+  }
+  .card-title {
+    font-size: 2rem;
+  }
+  .welcome-section .welcome-title {
+    font-size: 4.5rem; /* Ainda maior em desktop para Tangerine */
+  }
+  .welcome-section .welcome-subtitle {
+    font-size: 3.5rem; /* Ajuste para Tangerine */
+  }
+  .welcome-section .welcome-message {
+    font-size: 2rem; /* Ajuste para Tangerine */
+  }
+  .union-symbol .initials {
+    font-size: 6rem; /* Símbolo maior em desktop */
+  }
+  .union-symbol .ages {
+    font-size: 3rem;
+  }
+
+  @media (min-width: 1400px) {
+    .container {
+      max-width: 1140px;
+    }
+    body {
+      font-size: 1.1rem;
+    }
+    h1 {
+      font-size: 3.5rem;
+    }
+    h3 {
+      font-size: 2rem;
+    }
+    .upload-btn-custom {
+      max-width: 350px;
+    }
+    .welcome-section .welcome-title {
+      font-size: 5rem; /* Máximo tamanho em XXL */
+    }
+    .welcome-section .welcome-subtitle {
+      font-size: 3.8rem;
+    }
+    .welcome-section .welcome-message {
+      font-size: 2.2rem;
+    }
+    .union-symbol .initials {
+      font-size: 7rem;
+    }
+    .union-symbol .ages {
+      font-size: 3.5rem;
+    }
+  }
+}

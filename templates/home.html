@@ -1,0 +1,27 @@
+{# templates/home.html #} {% extends "base.html" %} {% block title
+%}Bem-vindo!{% endblock %} {% block content %}
+<div class="container mt-5 text-center">
+  <h1>Bem-vindo à Página de Convites!</h1>
+  <p class="lead">
+    Use o link exclusivo do seu convite para confirmar sua presença.
+  </p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %} {% if
+  messages %}
+  <div class="mt-4">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %} {% endwith %}
+
+  <div class="mt-5">
+    <p>Se você é o administrador, acesse o painel:</p>
+    <a
+      href="{{ url_for('admin_login') }}"
+      class="btn btn-outline-primary btn-lg"
+      >Acessar Painel Admin</a
+    >
+  </div>
+</div>
+{% endblock %}

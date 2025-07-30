@@ -1,0 +1,25 @@
+# Virtual environment
+venv/
+.venv/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.flaskenv
+
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# Test specific temporary folders
+tests/test_uploads/
+tests/test_static/
+
+# IDE specific files
+.vscode/
+.idea/

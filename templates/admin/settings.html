@@ -1,0 +1,182 @@
+{# templates/admin/settings.html #} {% extends "base.html" %} {% block title
+%}Configurações do Convite{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h1 class="mb-4">Configurações do Convite</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %} {% if
+  messages %}
+  <div class="mb-3">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %} {% endwith %}
+
+  <form
+    method="POST"
+    action="{{ url_for('admin_settings') }}"
+    enctype="multipart/form-data"
+  >
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        Textos e Links do Convite
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="welcome_title" class="form-label"
+            >Título de Boas-Vindas</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="welcome_title"
+            name="welcome_title"
+            value="{{ invite_details.welcome_title or '' }}"
+          />
+        </div>
+        <div class="mb-3">
+          <label for="welcome_message" class="form-label"
+            >Mensagem de Boas-Vindas</label
+          >
+          <textarea
+            class="form-control"
+            id="welcome_message"
+            name="welcome_message"
+            rows="3"
+          >
+{{ invite_details.welcome_message or '' }}</textarea
+          >
+          <div class="form-text">Use &lt;br /&gt; para quebras de linha.</div>
+        </div>
+        <div class="mb-3">
+          <label for="party_location_name" class="form-label"
+            >Nome do Local da Festa</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="party_location_name"
+            name="party_location_name"
+            value="{{ invite_details.party_location_name or '' }}"
+          />
+        </div>
+        <div class="mb-3">
+          <label for="party_location_url" class="form-label"
+            >Link para Abrir no Google Maps</label
+          >
+          <input
+            type="url"
+            class="form-control"
+            id="party_location_url"
+            name="party_location_url"
+            value="{{ invite_details.party_location_url or '' }}"
+          />
+          <div class="form-text">
+            Cole o link direto do Google Maps para o local.
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="party_date_talita_joaquim" class="form-label"
+            >Data da Festa Talita & Joaquim (30/08)</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="party_date_talita_joaquim"
+            name="party_date_talita_joaquim"
+            value="{{ invite_details.party_date_talita_joaquim or '' }}"
+          />
+        </div>
+        <div class="mb-3">
+          <label for="party_date_other" class="form-label"
+            >Data da Festa da Talita (29/08)</label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="party_date_other"
+            name="party_date_other"
+            value="{{ invite_details.party_date_other or '' }}"
+          />
+        </div>
+        <div class="mb-3">
+          <label for="max_video_duration_seconds" class="form-label"
+            >Duração Máxima de Vídeos (segundos)</label
+          >
+          <input
+            type="number"
+            class="form-control"
+            id="max_video_duration_seconds"
+            name="max_video_duration_seconds"
+            value="{{ invite_details.max_video_duration_seconds or '20' }}"
+            min="5"
+            max="60"
+          />
+          <div class="form-text">
+            Define o tempo máximo para vídeos enviados pelos convidados.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        Foto Principal do Convite
+      </div>
+      <div class="card-body">
+        {% if invite_details.main_photo_filename and
+        invite_details.main_photo_filename != 'None' %}
+        <p><strong>Foto Atual:</strong></p>
+        <img
+          src="{{ url_for('static', filename='img/' + invite_details.main_photo_filename) }}"
+          alt="Foto Atual"
+          class="img-fluid mb-3"
+          style="max-width: 300px"
+        />
+        <div class="form-check mb-3">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="remove_main_photo"
+            name="remove_main_photo"
+            value="true"
+          />
+          <label class="form-check-label" for="remove_main_photo">
+            Remover foto atual
+          </label>
+        </div>
+        {% else %}
+        <p>
+          Nenhuma foto principal definida. A foto padrão será usada
+          (sua_foto_do_aniversario.jpg).
+        </p>
+        {% endif %}
+        <div class="mb-3">
+          <label for="main_photo_filename" class="form-label"
+            >Carregar Nova Foto</label
+          >
+          <input
+            class="form-control"
+            type="file"
+            id="main_photo_filename"
+            name="main_photo_filename"
+            accept="image/*"
+          />
+          <div class="form-text">
+            Envie uma nova imagem (PNG, JPG, JPEG, GIF) para substituir a atual.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">
+      Salvar Configurações
+    </button>
+    <a
+      href="{{ url_for('admin_dashboard') }}"
+      class="btn btn-secondary btn-lg ms-2"
+      >Cancelar</a
+    >
+  </form>
+</div>
+{% endblock %}

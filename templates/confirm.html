@@ -1,0 +1,269 @@
+{# templates/confirm.html #} {% extends "base.html" %} {% block title
+%}Confirmação de Presença{% endblock %} {% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="text-center mb-5 welcome-section">
+      {% if invite_details.main_photo_filename and
+      invite_details.main_photo_filename != 'None' %}
+      <img
+        src="{{ url_for('static', filename='img/' + invite_details.main_photo_filename) }}"
+        alt="Talita e Joaquim - Aniversário"
+        class="img-fluid rounded welcome-image"
+      />
+      {% endif %}
+      <h1 class="display-5 fw-bold welcome-title">
+        {{ invite_details.welcome_title if invite_details.welcome_title else
+        'Celebre Conosco!' }}
+      </h1>
+      <p class="lead welcome-message">
+        {{ (invite_details.welcome_message | safe) if
+        invite_details.welcome_message else 'Estamos muito felizes em<br />convidá-lo(a)
+        para celebrar conosco!' }}
+      </p>
+      <div class="union-symbol mt-4">
+        <span class="initials">T <i class="bi bi-cake2"></i> J</span>
+        <span class="ages">20 | 50</span>
+      </div>
+    </div>
+    <hr />
+
+    {% with messages = get_flashed_messages(with_categories=true) %} {% if
+    messages %}
+    <div class="mb-3">
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %} {% endwith %}
+
+    <div class="party-details-section">
+      <h3 class="mt-4">Detalhes da Festa:</h3>
+      <p>
+        <strong>Data:</strong>
+        {% if guest_group.party_type == 'talita_joaquim' %} {{
+        invite_details.party_date_talita_joaquim if
+        invite_details.party_date_talita_joaquim else '30 de Agosto' }} {% else
+        %} {{ invite_details.party_date_other if invite_details.party_date_other
+        else '29 de Agosto' }} {% endif %}
+      </p>
+      <p>
+        <strong>Local:</strong>
+        {# O texto do local agora é um link clicável para o Google Maps #}
+        <a
+          href="{{ invite_details.party_location_url if invite_details.party_location_url else '#' }}"
+          target="_blank"
+          class="text-decoration-none"
+        >
+          {{ invite_details.party_location_name if
+          invite_details.party_location_name else 'ESTÂNCIA NA SERRA, CASA DE
+          TEMPORADA Santa Bárbara do Sapucaí, Piranguinho' }}
+          <i class="bi bi-geo-alt-fill ms-1"></i>
+        </a>
+      </p>
+
+      {# NOVO: Seção de Fotos do Local #} {% if venue_photos %}
+      <div class="venue-photos-section mt-4">
+        <div id="venueCarousel" class="carousel slide" data-bs-ride="carousel">
+          <div class="carousel-indicators">
+            {% for photo in venue_photos %}
+            <button
+              type="button"
+              data-bs-target="#venueCarousel"
+              data-bs-slide-to="{{ loop.index0 }}"
+              class="{{ 'active' if loop.first }}"
+              aria-current="{{ 'true' if loop.first }}"
+              aria-label="Slide {{ loop.index }}"
+            ></button>
+            {% endfor %}
+          </div>
+          <div class="carousel-inner">
+            {% for photo in venue_photos %}
+            <div class="carousel-item {{ 'active' if loop.first }}">
+              <img
+                src="{{ url_for('static', filename='img/venue_photos/' + photo.filename) }}"
+                class="d-block w-100 venue-photo-img"
+                alt="{{ photo.description or 'Foto do local' }}"
+              />
+              {% if photo.description %}
+              <div
+                class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded"
+              >
+                <h5>{{ photo.description }}</h5>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          <button
+            class="carousel-control-prev"
+            type="button"
+            data-bs-target="#venueCarousel"
+            data-bs-slide="prev"
+          >
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+          </button>
+          <button
+            class="carousel-control-next"
+            type="button"
+            data-bs-target="#venueCarousel"
+            data-bs-slide="next"
+          >
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+          </button>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-center text-muted mt-4">
+        Nenhuma foto do local disponível no momento.
+      </p>
+      {% endif %}
+    </div>
+    <hr />
+
+    <form
+      action="{{ url_for('confirm_presence_submit') }}"
+      method="POST"
+      enctype="multipart/form-data"
+    >
+      <input
+        type="hidden"
+        name="token"
+        value="{{ guest_group.unique_token }}"
+      />
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title mt-0">Quem irá comparecer?</h3>
+          <p class="card-text">
+            Por favor, selecione os membros da sua família que irão à festa:
+          </p>
+          {% for member in members %} {% if not member.is_plus_one %}
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              name="members_confirmed"
+              value="{{ member.id }}"
+              id="member_{{ member.id }}"
+              {%
+              if
+              member.is_confirmed
+              %}checked{%
+              endif
+              %}
+              {%
+              if
+              already_confirmed
+              %}disabled{%
+              endif
+              %}
+            />
+            <label class="form-check-label" for="member_{{ member.id }}">
+              {{ member.name }}
+            </label>
+          </div>
+          {% endif %} {% endfor %}
+
+          <div class="mb-3 mt-4">
+            <label for="plus_one_name" class="form-label"
+              >Você levará um acompanhante que não está na lista?</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="plus_one_name"
+              name="plus_one_name"
+              placeholder="Nome do acompanhante"
+              {%
+              if
+              guest_group.confirmations
+              and
+              guest_group.confirmations[0].plus_one_name
+              %}
+              value="{{ guest_group.confirmations[0].plus_one_name }}"
+              {%
+              endif
+              %}
+              {%
+              if
+              already_confirmed
+              %}disabled{%
+              endif
+              %}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title mt-0">Compartilhe suas fotos e vídeos!</h3>
+          <p class="card-text highlight-text">
+            Temos fotos juntos? Nos envie para podermos recordar!
+          </p>
+          <div class="mb-3">
+            <label for="photos" class="form-label text-center-label">
+              Fotos
+            </label>
+            <div class="text-center">
+              <input
+                class="form-control visually-hidden"
+                type="file"
+                id="photos"
+                name="photos"
+                accept="image/*"
+                multiple
+              />
+              <label
+                class="btn btn-outline-secondary upload-btn-custom"
+                for="photos"
+              >
+                <i class="bi bi-image-fill me-2"></i> Escolher Fotos
+              </label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="videos" class="form-label text-center-label">
+              Vídeos (máx. {{ invite_details.max_video_duration_seconds if
+              invite_details.max_video_duration_seconds else '20' }} segundos)
+            </label>
+            <div class="text-center">
+              <input
+                class="form-control visually-hidden"
+                type="file"
+                id="videos"
+                name="videos"
+                accept="video/*"
+                multiple
+                data-max-duration="{{ invite_details.max_video_duration_seconds if invite_details.max_video_duration_seconds else '20' }}"
+              />
+              <label
+                class="btn btn-outline-secondary upload-btn-custom"
+                for="videos"
+              >
+                <i class="bi bi-camera-video-fill me-2"></i> Escolher Vídeos
+              </label>
+            </div>
+            <div class="form-text text-center mt-2" id="video_help_text">
+              Vídeos com mais de {{ invite_details.max_video_duration_seconds if
+              invite_details.max_video_duration_seconds else '20' }} segundos
+              serão removidos.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-grid gap-2 mt-4">
+        <button type="submit" class="btn btn-primary btn-lg">
+          {% if already_confirmed %}Confirmar (Arquivos) / Já Confirmado{% else
+          %}Confirmar Presença{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block body_extra %}
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% endblock %}
