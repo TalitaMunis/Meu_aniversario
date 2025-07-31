@@ -3,6 +3,7 @@ import secrets
 from datetime import datetime
 from functools import wraps
 import uuid
+import json # Para lidar com o arquivo de chave JSON do GCS
 
 from flask import (
     Flask,
@@ -22,8 +23,11 @@ from werkzeug.utils import secure_filename
 from config import Config
 
 # Importa o db e todos os modelos do seu models.py
-# Adicione VenuePhoto aqui
 from models import db, Guest, GuestMember, Confirmation, Photo, Video, AdminUser, ConfigSetting, VenuePhoto
+
+# --- NOVO: Importações para o Google Cloud Storage ---
+from google.cloud import storage
+from google.oauth2 import service_account
 
 # --- Flask-Login: Instanciação Correta para Padrão de Fábrica ---
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -45,13 +49,20 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         return AdminUser.query.get(int(user_id))
-
-    # Garante que os diretórios de upload e static/img existem.
-    # Adicione também a pasta para fotos do local (venue_photos)
+    
+    # --- NOVO: Inicializa o cliente do Google Cloud Storage ---
+    # A variável de ambiente GOOGLE_APPLICATION_CREDENTIALS aponta para o arquivo JSON.
+    # O Render lida com isso automaticamente se o valor for o conteúdo do arquivo.
+    gcs_client = storage.Client()
+    gcs_bucket = gcs_client.bucket(app.config['GCS_BUCKET_NAME'])
+    
+    # NÃO precisamos mais criar os diretórios de upload localmente para a aplicação principal
+    # mas mantemos a criação para o 'static/img/venue_photos' para que as fotos de convite
+    # gerenciadas pelo admin (e que são servidas publicamente) ainda funcionem.
     with app.app_context():
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos'), exist_ok=True)
-
+        # Manter a pasta de upload local para o caso de teste local com `pytest`
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # --- Decorador de Autenticação Customizado para Admin ---
     def admin_required(f):
@@ -83,7 +94,6 @@ def create_app():
         details.setdefault('party_date_talita_joaquim', '30 de Agosto')
         details.setdefault('party_date_other', '29 de Agosto')
         details.setdefault('party_location_name', 'ESTÂNCIA NA SERRA, CASA DE TEMPORADA Santa Bárbara do Sapucaí, Piranguinho')
-        # NOVO: Define o link para abrir no Google Maps (não mais o embed)
         details.setdefault('party_location_url', 'http://googleusercontent.com/maps/search/EST%C3%82NCIA+NA+SERRA,+CASA+DE+TEMPORADA+Santa+B%C3%A1rbara+do+Sapuca%C3%AD,+Piranguinho')
 
         return details
@@ -95,17 +105,38 @@ def create_app():
         elif file_type == 'video':
             return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'}
         return False
+        
+    # --- NOVO: Funções de Upload e Gerenciamento de Arquivos para o GCS ---
+    def upload_to_gcs(file_obj, destination_blob_name):
+        """Faz o upload de um objeto de arquivo para o Google Cloud Storage."""
+        blob = gcs_bucket.blob(destination_blob_name)
+        file_obj.seek(0) # Volta para o início do arquivo para ler
+        blob.upload_from_file(file_obj, content_type=file_obj.content_type)
+        return blob.public_url
+
+    def delete_from_gcs(blob_name):
+        """Deleta um arquivo do Google Cloud Storage."""
+        blob = gcs_bucket.blob(blob_name)
+        blob.delete()
+
+    def get_gcs_public_url(blob_name):
+        """Gera uma URL pública para um arquivo no GCS."""
+        return f"http://storage.googleapis.com/{gcs_bucket.name}/{blob_name}"
 
     # --- ROTAS PÚBLICAS DA APLICAÇÃO ---
 
     @app.route("/")
     def home():
+        """Página inicial do site."""
         return render_template("home.html")
 
     @app.route("/confirm/<token>")
     def confirm_presence(token):
+        """
+        Página de confirmação de presença (RSVP) acessada por um link único.
+        """
         guest_group = Guest.query.filter_by(unique_token=token).first_or_404()
-        members = guest_group.members
+        members = guest_group.members 
         
         confirmation_record = Confirmation.query.filter_by(guest_id=guest_group.id).first()
         already_confirmed = confirmation_record is not None and \
@@ -114,7 +145,6 @@ def create_app():
 
         invite_details = get_invite_details()
         
-        # NOVO: Pega as fotos do local para exibir na página de confirmação
         venue_photos = VenuePhoto.query.order_by(VenuePhoto.order, VenuePhoto.upload_date.desc()).all()
 
 
@@ -124,11 +154,12 @@ def create_app():
             members=members,
             already_confirmed=already_confirmed,
             invite_details=invite_details,
-            venue_photos=venue_photos # Passa as fotos do local para o template
+            venue_photos=venue_photos
         )
 
     @app.route("/confirm_presence_submit", methods=["POST"])
     def confirm_presence_submit():
+        """Processa o formulário de confirmação de presença (RSVP) e uploads."""
         token = request.form.get("token")
         guest_group = Guest.query.filter_by(unique_token=token).first_or_404()
 
@@ -175,43 +206,44 @@ def create_app():
         else:
             flash('Sua presença já havia sido confirmada. Processando novos arquivos, se houver.', 'info')
 
-        invite_details = get_invite_details()
-        max_video_duration_seconds = invite_details.get('max_video_duration_seconds', 20)
-
+        # --- LÓGICA DE UPLOAD AGORA PARA GCS ---
+        # A lógica de upload de fotos e vídeos foi refatorada para usar as novas funções
+        
+        # Processar upload de fotos
         if 'photos' in request.files:
             for file in request.files.getlist('photos'):
-                if file.filename == '':
-                    continue
-                if allowed_file(file.filename, 'image'):
+                if file and file.filename != '' and allowed_file(file.filename, 'image'):
                     filename_secure = secure_filename(file.filename)
-                    unique_filename = f"{uuid.uuid4().hex}_{filename_secure}"
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}" # NOVO: Adiciona 'uploads/' ao caminho no GCS
+                    
                     try:
-                        file.save(filepath)
+                        # Upload para o GCS
+                        upload_to_gcs(file, unique_filename)
+                        
                         new_photo = Photo(confirmation_id=confirmation.id, filename=unique_filename, upload_date=datetime.utcnow())
                         db.session.add(new_photo)
-                        flash(f'Foto "{filename_secure}" enviada com sucesso!', 'success')
+                        flash(f'Foto "{filename_secure}" enviada para o GCS com sucesso!', 'success')
                     except Exception as e:
-                        flash(f"Erro ao salvar foto {filename_secure}: {e}", 'danger')
-                else:
+                        flash(f"Erro ao enviar foto {filename_secure} para o GCS: {e}", 'danger')
+                elif file.filename != '':
                     flash(f"Tipo de arquivo não permitido para foto: {file.filename}", 'warning')
 
+        # Processar upload de vídeos
         if 'videos' in request.files:
             for file in request.files.getlist('videos'):
-                if file.filename == '':
-                    continue
-                if allowed_file(file.filename, 'video'):
+                if file and file.filename != '' and allowed_file(file.filename, 'video'):
                     filename_secure = secure_filename(file.filename)
-                    unique_filename = f"{uuid.uuid4().hex}_{filename_secure}"
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}" # NOVO: Adiciona 'uploads/' ao caminho no GCS
+                    
                     try:
-                        file.save(filepath)
+                        upload_to_gcs(file, unique_filename)
+
                         new_video = Video(confirmation_id=confirmation.id, filename=unique_filename, upload_date=datetime.utcnow(), duration_seconds=None)
                         db.session.add(new_video)
-                        flash(f'Vídeo "{filename_secure}" enviado com sucesso!', 'success')
+                        flash(f'Vídeo "{filename_secure}" enviado para o GCS com sucesso!', 'success')
                     except Exception as e:
-                        flash(f"Erro ao salvar vídeo {filename_secure}: {e}", 'danger')
-                else:
+                        flash(f"Erro ao enviar vídeo {filename_secure} para o GCS: {e}", 'danger')
+                elif file.filename != '':
                     flash(f"Tipo de arquivo não permitido para vídeo: {file.filename}", 'warning')
         
         db.session.commit()
@@ -220,19 +252,15 @@ def create_app():
 
     @app.route('/uploads/<filename>')
     def uploads(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        """Redireciona a visualização para a URL pública do GCS."""
+        # A URL do GCS já inclui o nome do bucket e o caminho.
+        return redirect(get_gcs_public_url(filename))
 
     @app.route('/download/<filename>')
     @admin_required
     def download_file(filename):
-        try:
-            return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
-        except FileNotFoundError:
-            flash(f"Arquivo '{filename}' não encontrado.", 'danger')
-            return redirect(url_for('admin_media'))
-        except Exception as e:
-            flash(f"Erro ao baixar arquivo: {e}", 'danger')
-            return redirect(url_for('admin_dashboard'))
+        """Permite o download de arquivos diretamente do GCS."""
+        return redirect(get_gcs_public_url(filename))
 
     # --- ROTAS DO PAINEL DE ADMINISTRAÇÃO ---
 
@@ -270,35 +298,25 @@ def create_app():
         total_guests = GuestMember.query.count()
         total_confirmed = GuestMember.query.filter_by(is_confirmed=True).count()
         total_unconfirmed = total_guests - total_confirmed
-
         total_plus_one = GuestMember.query.filter_by(is_plus_one=True, is_confirmed=True).count()
-
         total_guests_joint = GuestMember.query.join(Guest).filter(Guest.party_type == 'talita_joaquim').count()
         total_confirmed_joint = GuestMember.query.join(Guest).filter(Guest.party_type == 'talita_joaquim', GuestMember.is_confirmed == True).count()
-
         total_guests_talita = GuestMember.query.join(Guest).filter(Guest.party_type == 'talita_29_08').count()
         total_confirmed_talita = GuestMember.query.join(Guest).filter(Guest.party_type == 'talita_29_08', GuestMember.is_confirmed == True).count()
-
         total_photos = Photo.query.count()
         total_videos = Video.query.count()
-        total_venue_photos = VenuePhoto.query.count() # NOVO: Contagem de fotos do local
+        total_venue_photos = VenuePhoto.query.count()
 
         all_guest_groups = Guest.query.order_by(Guest.group_name).all()
 
         return render_template("admin/dashboard.html",
-                               total_guests=total_guests,
-                               total_confirmed=total_confirmed,
-                               total_unconfirmed=total_unconfirmed,
-                               total_plus_one=total_plus_one,
-                               total_guests_joint=total_guests_joint,
-                               total_confirmed_joint=total_confirmed_joint,
-                               total_guests_talita=total_guests_talita,
-                               total_confirmed_talita=total_confirmed_talita,
-                               total_photos=total_photos,
-                               total_videos=total_videos,
-                               total_venue_photos=total_venue_photos, # NOVO: Passa a contagem de fotos do local
-                               all_guest_groups=all_guest_groups
-                               )
+                               total_guests=total_guests, total_confirmed=total_confirmed,
+                               total_unconfirmed=total_unconfirmed, total_plus_one=total_plus_one,
+                               total_guests_joint=total_guests_joint, total_confirmed_joint=total_confirmed_joint,
+                               total_guests_talita=total_guests_talita, total_confirmed_talita=total_confirmed_talita,
+                               total_photos=total_photos, total_videos=total_videos,
+                               total_venue_photos=total_venue_photos,
+                               all_guest_groups=all_guest_groups)
 
     @app.route("/admin/settings", methods=["GET", "POST"])
     @admin_required
@@ -312,7 +330,7 @@ def create_app():
                 'party_date_talita_joaquim': request.form.get('party_date_talita_joaquim'),
                 'party_date_other': request.form.get('party_date_other'),
                 'party_location_name': request.form.get('party_location_name'),
-                'party_location_url': request.form.get('party_location_url'), # NOVO: Campo para o link clicável
+                'party_location_url': request.form.get('party_location_url'),
                 'max_video_duration_seconds': request.form.get('max_video_duration_seconds'),
             }
 
@@ -327,6 +345,8 @@ def create_app():
             if 'main_photo_filename' in request.files:
                 photo_file = request.files['main_photo_filename']
                 if photo_file and photo_file.filename != '' and allowed_file(photo_file.filename, 'image'):
+                    # A lógica de upload de foto principal do convite ainda usa o sistema de arquivos local
+                    # pois esta é uma imagem estática que deve estar no repositório.
                     new_filename = secure_filename(f"{uuid.uuid4().hex}_{photo_file.filename}")
                     filepath = os.path.join(app.config['STATIC_FOLDER'], 'img', new_filename)
 
@@ -379,10 +399,8 @@ def create_app():
         if request.method == "POST":
             group_name = request.form.get("group_name")
             party_type = request.form.get("party_type")
-            
             member_names_dynamic = request.form.getlist("member_name[]")
-            is_confirmed_dynamic_checkboxes = request.form.getlist("is_confirmed[]") 
-
+            is_confirmed_dynamic_checkboxes = request.form.getlist("is_confirmed[]")
             plus_one_name = request.form.get("plus_one_name", "").strip()
 
             if not group_name or not party_type:
@@ -395,7 +413,7 @@ def create_app():
 
             for i, name in enumerate(member_names_dynamic):
                 if name.strip():
-                    is_confirmed = (str(i) in is_confirmed_dynamic_checkboxes)
+                    is_confirmed = (str(i) in is_confirmed_dynamic_checkboxes) 
                     member = GuestMember(guest_id=new_guest_group.id, name=name.strip(), is_plus_one=False, is_confirmed=is_confirmed)
                     db.session.add(member)
 
@@ -421,7 +439,6 @@ def create_app():
         if request.method == "POST":
             guest.group_name = request.form.get("group_name")
             guest.party_type = request.form.get("party_type")
-
             submitted_member_ids = request.form.getlist("member_id[]")
             submitted_member_names = request.form.getlist("member_name[]")
             submitted_is_confirmed_checkboxes = request.form.getlist("is_confirmed[]")
@@ -430,9 +447,7 @@ def create_app():
             for i, name_from_form in enumerate(submitted_member_names):
                 if name_from_form.strip():
                     member_id_val = submitted_member_ids[i]
-                    is_confirmed_val = (member_id_val in submitted_is_confirmed_checkboxes) # For existing members
-                    if member_id_val.startswith('new_'): # For dynamically added new members
-                        is_confirmed_val = (f"new_member_checkbox_{i}" in submitted_is_confirmed_checkboxes) # Check specific name for new ones
+                    is_confirmed_val = (member_id_val in submitted_is_confirmed_checkboxes)
                     
                     members_data_from_form.append({
                         'id': int(member_id_val) if member_id_val.isdigit() else member_id_val,
@@ -516,6 +531,7 @@ def create_app():
             flash(f'Erro ao excluir grupo: {e}', 'danger')
         return redirect(url_for('admin_guests'))
 
+
     @app.route("/admin/media")
     @admin_required
     def admin_media():
@@ -523,15 +539,14 @@ def create_app():
         videos = Video.query.order_by(Video.upload_date.desc()).all()
         return render_template("admin/media.html", photos=photos, videos=videos)
 
-    @app.route("/admin/media/delete/<string:media_type>/<int:media_id>", methods=["POST"])
+    @app.route("/admin/media/delete/<string:media_type>/<int:id>", methods=["POST"])
     @admin_required
-    def admin_delete_media(media_type, media_id): # <-- ESTES SÃO OS NOMES CORRETOS DOS PARÂMETROS
-        """Exclui uma mídia (foto ou vídeo) e seu arquivo."""
+    def admin_delete_media(media_type, id):
         media_item = None
         if media_type == 'photo':
-            media_item = Photo.query.get_or_404(media_id)
+            media_item = Photo.query.get_or_404(id)
         elif media_type == 'video':
-            media_item = Video.query.get_or_404(media_id)
+            media_item = Video.query.get_or_404(id)
         else:
             flash('Tipo de mídia inválido.', 'danger')
             return redirect(url_for('admin_media'))
@@ -551,7 +566,6 @@ def create_app():
             db.session.rollback()
             flash(f'Erro ao excluir mídia: {e}', 'danger')
         return redirect(url_for('admin_media'))
-
 
     # --- NOVO: Rotas para Gerenciamento de Fotos do Local (Venue Photos) ---
     @app.route("/admin/venue_photos")
@@ -609,8 +623,6 @@ def create_app():
             order_str = request.form.get("order", "0").strip()
             photo.order = int(order_str) if order_str.isdigit() else 0
             
-            # Não permite alterar o arquivo da foto por esta rota. Seria uma rota separada ou delete/re-upload.
-
             db.session.commit()
             flash('Foto do local atualizada com sucesso!', 'success')
             return redirect(url_for('admin_venue_photos'))
@@ -641,21 +653,14 @@ def create_app():
 
 
     # --- Rotas de Inicialização/Exemplo (apenas para desenvolvimento) ---
-    # !!! ATENÇÃO: Essas rotas devem ser REMOVIDAS ou PROTEGIDAS em ambiente de PRODUÇÃO !!!
-
     @app.route("/create_db_and_admin")
     def create_db_and_admin():
-        """
-        Rota para criar todas as tabelas do banco de dados e um usuário administrador inicial.
-        Também popula as configurações padrão do convite.
-        DEVE SER EXECUTADA APENAS UMA VEZ.
-        """
         with app.app_context():
             db.create_all()
 
             if not AdminUser.query.first():
                 admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-                admin_password = os.environ.get('ADMIN_PASSWORD', 'adminpass') # <<< MUDE ESTA SENHA EM PRODUÇÃO! >>>
+                admin_password = os.environ.get('ADMIN_PASSWORD', 'adminpass')
                 admin_email = os.environ.get('ADMIN_EMAIL', 'admin@example.com') 
                 hashed_password = generate_password_hash(admin_password)
                 
@@ -673,7 +678,7 @@ def create_app():
                 'party_date_talita_joaquim': '30 de Agosto',
                 'party_date_other': '29 de Agosto',
                 'party_location_name': 'ESTÂNCIA NA SERRA, CASA DE TEMPORADA Santa Bárbara do Sapucaí, Piranguinho',
-                'party_location_url': 'http://googleusercontent.com/maps/search/EST%C3%82NCIA+NA+SERRA,+CASA+DE+TEMPORADA+Santa+B%C3%A1rbara+do+Sapuca%C3%AD,+Piranguinho', # NOVO: URL padrão para o link clicável
+                'party_location_url': 'http://googleusercontent.com/maps/search/EST%C3%82NCIA+NA+SERRA,+CASA+DE+TEMPORADA+Santa+B%C3%A1rbara+do+Sapuca%C3%AD,+Piranguinho',
                 'max_video_duration_seconds': '20',
             }
 
@@ -682,14 +687,9 @@ def create_app():
                     setting = ConfigSetting(key=key, value=value)
                     db.session.add(setting)
             
-            # NOVO: Adiciona uma foto de exemplo para o local se não houver
             if not VenuePhoto.query.first():
-                # Certifique-se de ter uma imagem chamada 'venue_placeholder.jpg' em static/img/venue_photos/
-                # ou remova este bloco se não quiser uma foto padrão.
                 if not os.path.exists(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos', 'venue_placeholder.jpg')):
                     print("AVISO: Crie 'static/img/venue_photos/venue_placeholder.jpg' para a foto padrão do local.")
-                    # Pode criar um arquivo dummy para evitar erro se quiser:
-                    # with open(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos', 'venue_placeholder.jpg'), 'w') as f: f.write("dummy")
 
                 default_venue_photo = VenuePhoto(
                     filename='venue_placeholder.jpg',
@@ -699,14 +699,12 @@ def create_app():
                 db.session.add(default_venue_photo)
                 flash('Foto de local padrão adicionada. Altere-a no painel!', 'info')
 
-
             db.session.commit()
             flash('Setup inicial de banco de dados e admin concluído!', 'success')
         return redirect(url_for('home'))
 
     @app.route("/add_sample_guests")
     def add_sample_guests():
-        """Adiciona alguns convidados de exemplo para testes. DEVE SER REMOVIDA EM PRODUÇÃO."""
         with app.app_context():
             if Guest.query.count() == 0: 
                 guest1 = Guest(group_name='Família Silva', party_type='talita_joaquim', unique_token=secrets.token_urlsafe(16))
@@ -747,12 +745,10 @@ def create_app():
 
         return redirect(url_for('home'))
 
-    return app # Retorna a instância do aplicativo configurado
+    return app
 
-# --- EXECUÇÃO DO APLICATIVO (Entry Point para Gunicorn e Local) ---
-# O Gunicorn encontrará o objeto 'app' neste nível.
+# --- EXECUÇÃO DO APLICATIVO (Entry Point) ---
 app = create_app()
 
 if __name__ == "__main__":
-    # Este bloco só é executado quando o arquivo é rodado diretamente (desenvolvimento local)
     app.run(debug=True)

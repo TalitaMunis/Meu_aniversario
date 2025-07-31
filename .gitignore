@@ -23,3 +23,6 @@ tests/test_static/
 # IDE specific files
 .vscode/
 .idea/
+
+#chaves
+keys/
