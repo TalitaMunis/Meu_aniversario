@@ -49,17 +49,33 @@ def create_app():
         return AdminUser.query.get(int(user_id))
     
     # --- Inicializa o cliente do Google Cloud Storage ---
-    # O Render lida com isso automaticamente através da variável de ambiente GOOGLE_APPLICATION_CREDENTIALS.
-    gcs_client = storage.Client()
+    # A variável de ambiente GOOGLE_APPLICATION_CREDENTIALS aponta para o arquivo JSON.
+    # O Render lida com isso automaticamente se o valor for o conteúdo do arquivo.
+    gcs_client = None
+    gcs_credentials_json_content = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+
+    try:
+        if gcs_credentials_json_content:
+            credentials_info = json.loads(gcs_credentials_json_content)
+            gcs_credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            gcs_client = storage.Client(credentials=gcs_credentials)
+            print("Cliente do Google Cloud Storage inicializado com JSON da variável de ambiente.")
+        else:
+            gcs_client = storage.Client()
+            print("Cliente do Google Cloud Storage inicializado com credenciais padrão.")
+    except Exception as e:
+        print(f"Erro ao inicializar o cliente GCS com JSON da variável de ambiente: {e}")
+        gcs_client = storage.Client()
+
     gcs_bucket = gcs_client.bucket(app.config['GCS_BUCKET_NAME'])
     
     with app.app_context():
         # A pasta de uploads local agora é usada apenas para testes, mas garantimos que existe.
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        # Manteremos a pasta de imagens estáticas localmente, já que a foto principal
-        # é um recurso do projeto e não um upload de usuário. No entanto, as imagens
-        # do local (VenuePhoto) serão movidas para o GCS.
         os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img'), exist_ok=True)
+        # Manteremos a pasta de fotos do local para desenvolvimento local, mas o GCS será o principal.
+        os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos'), exist_ok=True)
+
 
     # --- Decorador de Autenticação Customizado para Admin ---
     def admin_required(f):
@@ -99,21 +115,17 @@ def create_app():
         return False
         
     # --- FUNÇÕES DE ARMAZENAMENTO NA NUVEM ---
-    # As funções para GCS foram movidas para o escopo global.
     def upload_to_gcs(file_obj, destination_blob_name):
-        """Faz o upload de um objeto de arquivo para o Google Cloud Storage."""
         blob = gcs_bucket.blob(destination_blob_name)
         file_obj.seek(0)
         blob.upload_from_file(file_obj, content_type=file_obj.content_type)
         return blob.public_url
 
     def delete_from_gcs(blob_name):
-        """Deleta um arquivo do Google Cloud Storage."""
         blob = gcs_bucket.blob(blob_name)
         blob.delete()
 
     def get_gcs_public_url(blob_name):
-        """Gera uma URL pública para um arquivo no GCS."""
         return f"http://storage.googleapis.com/{gcs_bucket.name}/{blob_name}"
 
     # --- ROTAS PÚBLICAS DA APLICAÇÃO ---
@@ -196,10 +208,6 @@ def create_app():
         invite_details = get_invite_details()
         max_video_duration_seconds = invite_details.get('max_video_duration_seconds', 20)
 
-        # --- LÓGICA DE UPLOAD AGORA PARA GCS ---
-        # A lógica de upload de fotos e vídeos foi refatorada para usar as novas funções
-        
-        # Processar upload de fotos
         if 'photos' in request.files:
             for file in request.files.getlist('photos'):
                 if file and file.filename != '' and allowed_file(file.filename, 'image'):
@@ -208,7 +216,6 @@ def create_app():
                     
                     try:
                         upload_to_gcs(file, unique_filename)
-                        
                         new_photo = Photo(confirmation_id=confirmation.id, filename=unique_filename, upload_date=datetime.utcnow())
                         db.session.add(new_photo)
                         flash(f'Foto "{filename_secure}" enviada para o GCS com sucesso!', 'success')
@@ -217,7 +224,6 @@ def create_app():
                 elif file.filename != '':
                     flash(f"Tipo de arquivo não permitido para foto: {file.filename}", 'warning')
 
-        # Processar upload de vídeos
         if 'videos' in request.files:
             for file in request.files.getlist('videos'):
                 if file and file.filename != '' and allowed_file(file.filename, 'video'):
@@ -499,14 +505,14 @@ def create_app():
             for confirmation_obj in guest.confirmations:
                 for photo_obj in confirmation_obj.photos:
                     try:
-                        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], photo_obj.filename))
-                    except OSError:
-                        pass
+                        delete_from_gcs(photo_obj.filename)
+                    except Exception as e:
+                        print(f"Erro ao deletar foto '{photo_obj.filename}' do GCS: {e}")
                 for video_obj in confirmation_obj.videos:
                     try:
-                        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], video_obj.filename))
-                    except OSError:
-                        pass
+                        delete_from_gcs(video_obj.filename)
+                    except Exception as e:
+                        print(f"Erro ao deletar vídeo '{video_obj.filename}' do GCS: {e}")
             
             db.session.delete(guest)
             db.session.commit()
@@ -537,33 +543,25 @@ def create_app():
             return redirect(url_for('admin_media'))
 
         try:
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], media_item.filename)
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                flash(f'Arquivo "{media_item.filename}" removido do servidor.', 'info')
-            else:
-                flash(f'Arquivo "{media_item.filename}" não encontrado no servidor, mas o registro será removido.', 'warning')
-
-            db.session.delete(media_item)
-            db.session.commit()
-            flash(f'{media_type.capitalize()} excluído(a) com sucesso do banco de dados!', 'success')
+            delete_from_gcs(media_item.filename)
+            flash(f'Arquivo "{media_item.filename}" removido do GCS.', 'info')
         except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao excluir mídia: {e}', 'danger')
+            flash(f'Erro ao remover arquivo do GCS: {e}', 'warning')
+
+        db.session.delete(media_item)
+        db.session.commit()
+        flash(f'{media_type.capitalize()} excluído(a) com sucesso do banco de dados!', 'success')
         return redirect(url_for('admin_media'))
 
-    # --- NOVO: Rotas para Gerenciamento de Fotos do Local (Venue Photos) ---
     @app.route("/admin/venue_photos")
     @admin_required
     def admin_venue_photos():
-        """Lista e gerencia as fotos do local da festa."""
         photos = VenuePhoto.query.order_by(VenuePhoto.order, VenuePhoto.upload_date.desc()).all()
         return render_template("admin/venue_photos.html", photos=photos)
 
     @app.route("/admin/venue_photos/add", methods=["GET", "POST"])
     @admin_required
     def admin_add_venue_photo():
-        """Adiciona uma nova foto do local."""
         if request.method == "POST":
             description = request.form.get("description", "").strip()
             order_str = request.form.get("order", "0").strip()
@@ -580,27 +578,26 @@ def create_app():
 
             if file and allowed_file(file.filename, 'image'):
                 filename_secure = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
-                filepath = os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos', filename_secure)
+                blob_name = f"venue_photos/{filename_secure}"
                 try:
-                    file.save(filepath)
-                    new_photo = VenuePhoto(filename=filename_secure, description=description, order=order, upload_date=datetime.utcnow())
+                    upload_to_gcs(file, blob_name)
+                    new_photo = VenuePhoto(filename=blob_name, description=description, order=order, upload_date=datetime.utcnow())
                     db.session.add(new_photo)
                     db.session.commit()
                     flash('Foto do local adicionada com sucesso!', 'success')
                 except Exception as e:
                     db.session.rollback()
-                    flash(f"Erro ao adicionar foto do local: {e}", 'danger')
+                    flash(f"Erro ao adicionar foto do local no GCS: {e}", 'danger')
             else:
                 flash('Tipo de arquivo não permitido para foto do local.', 'danger')
             
             return redirect(url_for('admin_venue_photos'))
         
-        return render_template("admin/venue_photo_add.html") # Template para o formulário de adicionar foto
+        return render_template("admin/venue_photo_add.html")
 
     @app.route("/admin/venue_photos/edit/<int:photo_id>", methods=["GET", "POST"])
     @admin_required
     def admin_edit_venue_photo(photo_id):
-        """Edita a descrição e ordem de uma foto do local existente."""
         photo = VenuePhoto.query.get_or_404(photo_id)
 
         if request.method == "POST":
@@ -617,27 +614,19 @@ def create_app():
     @app.route("/admin/venue_photos/delete/<int:photo_id>", methods=["POST"])
     @admin_required
     def admin_delete_venue_photo(photo_id):
-        """Exclui uma foto do local e seu arquivo físico."""
         photo = VenuePhoto.query.get_or_404(photo_id)
-        filepath = os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos', photo.filename)
-
+        
         try:
+            delete_from_gcs(photo.filename)
             db.session.delete(photo)
             db.session.commit()
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                flash(f'Arquivo "{photo.filename}" removido do servidor.', 'info')
-            else:
-                flash(f'Arquivo "{photo.filename}" não encontrado no servidor, mas o registro foi removido.', 'warning')
             flash('Foto do local excluída com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
-            flash(f'Erro ao excluir foto do local: {e}', 'danger')
+            flash(f'Erro ao excluir foto do local do GCS: {e}', 'danger')
         
         return redirect(url_for('admin_venue_photos'))
 
-
-    # --- Rotas de Inicialização/Exemplo (apenas para desenvolvimento) ---
     @app.route("/create_db_and_admin")
     def create_db_and_admin():
         with app.app_context():
@@ -672,17 +661,8 @@ def create_app():
                     setting = ConfigSetting(key=key, value=value)
                     db.session.add(setting)
             
-            if not VenuePhoto.query.first():
-                if not os.path.exists(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos', 'venue_placeholder.jpg')):
-                    print("AVISO: Crie 'static/img/venue_photos/venue_placeholder.jpg' para a foto padrão do local.")
-
-                default_venue_photo = VenuePhoto(
-                    filename='venue_placeholder.jpg',
-                    description='Foto do local (placeholder)',
-                    order=1
-                )
-                db.session.add(default_venue_photo)
-                flash('Foto de local padrão adicionada. Altere-a no painel!', 'info')
+            # ATENÇÃO: Nenhuma foto de local padrão é adicionada aqui, pois agora o GCS é usado.
+            # Você precisará usar o painel admin para fazer o upload da sua primeira foto do local.
 
             db.session.commit()
             flash('Setup inicial de banco de dados e admin concluído!', 'success')
