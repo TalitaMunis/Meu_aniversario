@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime
 from functools import wraps
 import uuid
-import json # Para lidar com o arquivo de chave JSON do GCS
+import json 
 
 from flask import (
     Flask,
@@ -25,7 +25,7 @@ from config import Config
 # Importa o db e todos os modelos do seu models.py
 from models import db, Guest, GuestMember, Confirmation, Photo, Video, AdminUser, ConfigSetting, VenuePhoto
 
-# --- NOVO: Importações para o Google Cloud Storage ---
+# --- Importações para o Google Cloud Storage ---
 from google.cloud import storage
 from google.oauth2 import service_account
 
@@ -38,11 +38,9 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Inicializa as extensões com o aplicativo Flask
     db.init_app(app)
     login_manager.init_app(app)
 
-    # --- Configuração do Flask-Login ---
     login_manager.login_view = 'admin_login'
     login_manager.login_message_category = 'warning'
 
@@ -50,19 +48,18 @@ def create_app():
     def load_user(user_id):
         return AdminUser.query.get(int(user_id))
     
-    # --- NOVO: Inicializa o cliente do Google Cloud Storage ---
-    # A variável de ambiente GOOGLE_APPLICATION_CREDENTIALS aponta para o arquivo JSON.
-    # O Render lida com isso automaticamente se o valor for o conteúdo do arquivo.
+    # --- Inicializa o cliente do Google Cloud Storage ---
+    # O Render lida com isso automaticamente através da variável de ambiente GOOGLE_APPLICATION_CREDENTIALS.
     gcs_client = storage.Client()
     gcs_bucket = gcs_client.bucket(app.config['GCS_BUCKET_NAME'])
     
-    # NÃO precisamos mais criar os diretórios de upload localmente para a aplicação principal
-    # mas mantemos a criação para o 'static/img/venue_photos' para que as fotos de convite
-    # gerenciadas pelo admin (e que são servidas publicamente) ainda funcionem.
     with app.app_context():
-        os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos'), exist_ok=True)
-        # Manter a pasta de upload local para o caso de teste local com `pytest`
+        # A pasta de uploads local agora é usada apenas para testes, mas garantimos que existe.
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        # Manteremos a pasta de imagens estáticas localmente, já que a foto principal
+        # é um recurso do projeto e não um upload de usuário. No entanto, as imagens
+        # do local (VenuePhoto) serão movidas para o GCS.
+        os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img'), exist_ok=True)
 
     # --- Decorador de Autenticação Customizado para Admin ---
     def admin_required(f):
@@ -76,10 +73,6 @@ def create_app():
     
     # --- Funções Auxiliares Comuns ---
     def get_invite_details():
-        """
-        Busca todas as configurações dinâmicas do banco de dados (ConfigSetting).
-        Fornece valores padrão se as configurações não existirem no DB.
-        """
         settings_query = ConfigSetting.query.all()
         details = {setting.key: setting.value for setting in settings_query}
 
@@ -99,18 +92,18 @@ def create_app():
         return details
 
     def allowed_file(filename, file_type='image'):
-        """Verifica se a extensão do arquivo é permitida com base no tipo."""
         if file_type == 'image':
             return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
         elif file_type == 'video':
             return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'}
         return False
         
-    # --- NOVO: Funções de Upload e Gerenciamento de Arquivos para o GCS ---
+    # --- FUNÇÕES DE ARMAZENAMENTO NA NUVEM ---
+    # As funções para GCS foram movidas para o escopo global.
     def upload_to_gcs(file_obj, destination_blob_name):
         """Faz o upload de um objeto de arquivo para o Google Cloud Storage."""
         blob = gcs_bucket.blob(destination_blob_name)
-        file_obj.seek(0) # Volta para o início do arquivo para ler
+        file_obj.seek(0)
         blob.upload_from_file(file_obj, content_type=file_obj.content_type)
         return blob.public_url
 
@@ -127,14 +120,10 @@ def create_app():
 
     @app.route("/")
     def home():
-        """Página inicial do site."""
         return render_template("home.html")
 
     @app.route("/confirm/<token>")
     def confirm_presence(token):
-        """
-        Página de confirmação de presença (RSVP) acessada por um link único.
-        """
         guest_group = Guest.query.filter_by(unique_token=token).first_or_404()
         members = guest_group.members 
         
@@ -144,7 +133,6 @@ def create_app():
                              (confirmation_record.plus_one_name is not None and confirmation_record.plus_one_name != ''))
 
         invite_details = get_invite_details()
-        
         venue_photos = VenuePhoto.query.order_by(VenuePhoto.order, VenuePhoto.upload_date.desc()).all()
 
 
@@ -159,7 +147,6 @@ def create_app():
 
     @app.route("/confirm_presence_submit", methods=["POST"])
     def confirm_presence_submit():
-        """Processa o formulário de confirmação de presença (RSVP) e uploads."""
         token = request.form.get("token")
         guest_group = Guest.query.filter_by(unique_token=token).first_or_404()
 
@@ -206,6 +193,9 @@ def create_app():
         else:
             flash('Sua presença já havia sido confirmada. Processando novos arquivos, se houver.', 'info')
 
+        invite_details = get_invite_details()
+        max_video_duration_seconds = invite_details.get('max_video_duration_seconds', 20)
+
         # --- LÓGICA DE UPLOAD AGORA PARA GCS ---
         # A lógica de upload de fotos e vídeos foi refatorada para usar as novas funções
         
@@ -214,10 +204,9 @@ def create_app():
             for file in request.files.getlist('photos'):
                 if file and file.filename != '' and allowed_file(file.filename, 'image'):
                     filename_secure = secure_filename(file.filename)
-                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}" # NOVO: Adiciona 'uploads/' ao caminho no GCS
+                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}"
                     
                     try:
-                        # Upload para o GCS
                         upload_to_gcs(file, unique_filename)
                         
                         new_photo = Photo(confirmation_id=confirmation.id, filename=unique_filename, upload_date=datetime.utcnow())
@@ -233,7 +222,7 @@ def create_app():
             for file in request.files.getlist('videos'):
                 if file and file.filename != '' and allowed_file(file.filename, 'video'):
                     filename_secure = secure_filename(file.filename)
-                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}" # NOVO: Adiciona 'uploads/' ao caminho no GCS
+                    unique_filename = f"uploads/{uuid.uuid4().hex}_{filename_secure}"
                     
                     try:
                         upload_to_gcs(file, unique_filename)
@@ -252,14 +241,11 @@ def create_app():
 
     @app.route('/uploads/<filename>')
     def uploads(filename):
-        """Redireciona a visualização para a URL pública do GCS."""
-        # A URL do GCS já inclui o nome do bucket e o caminho.
         return redirect(get_gcs_public_url(filename))
 
     @app.route('/download/<filename>')
     @admin_required
     def download_file(filename):
-        """Permite o download de arquivos diretamente do GCS."""
         return redirect(get_gcs_public_url(filename))
 
     # --- ROTAS DO PAINEL DE ADMINISTRAÇÃO ---
@@ -345,8 +331,7 @@ def create_app():
             if 'main_photo_filename' in request.files:
                 photo_file = request.files['main_photo_filename']
                 if photo_file and photo_file.filename != '' and allowed_file(photo_file.filename, 'image'):
-                    # A lógica de upload de foto principal do convite ainda usa o sistema de arquivos local
-                    # pois esta é uma imagem estática que deve estar no repositório.
+                    # Lógica de upload da foto principal do convite (para static/img)
                     new_filename = secure_filename(f"{uuid.uuid4().hex}_{photo_file.filename}")
                     filepath = os.path.join(app.config['STATIC_FOLDER'], 'img', new_filename)
 
