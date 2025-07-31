@@ -91,14 +91,15 @@ class Video(db.Model):
     def __repr__(self):
         return f"Video('{self.filename}', Conf ID: {self.confirmation_id})"
 
-class AdminUser(db.Model, UserMixin): # UserMixin para integração com Flask-Login
+class AdminUser(db.Model, UserMixin):
     """
     Representa um usuário administrador para acessar o painel de controle.
     """
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False) # Username deve ser único e não nulo
-    password_hash = db.Column(db.String(128), nullable=False) # Hash da senha
-    email = db.Column(db.String(120), unique=True, nullable=False) # Email deve ser único e não nulo
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    # LINHA CORRIGIDA AQUI: Aumentamos o tamanho do campo para suportar hashes maiores.
+    password_hash = db.Column(db.Text, nullable=False) 
+    email = db.Column(db.String(120), unique=True, nullable=False)
 
     def __repr__(self):
         return f"AdminUser('{self.username}', '{self.email}')"
