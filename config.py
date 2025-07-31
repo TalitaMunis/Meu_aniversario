@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 # ADMIN_USERNAME=admin (opcional, para usuário padrão do setup)
 # ADMIN_PASSWORD=adminpass (opcional, para senha padrão do setup)
 # ADMIN_EMAIL=admin@example.com (opcional, para email padrão do setup)
+# GCS_BUCKET_NAME=nome_do_seu_bucket_gcs_aqui
 load_dotenv()
 
 class Config:
@@ -28,20 +29,23 @@ class Config:
     SQLALCHEMY_DATABASE_URI_TEST = 'sqlite:///:memory:' 
     
     # Desativa o rastreamento de modificações do SQLAlchemy.
-    # Pode ser ativado para debugging, mas é geralmente False em produção.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Caminho absoluto para a pasta onde os arquivos enviados pelos convidados serão armazenados (uploads/)
+    # No deploy, essa pasta não será usada para uploads reais, mas é necessária para a lógica de `pytest` e desenvolvimento.
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     
     # Caminho absoluto para a pasta 'static/' do seu projeto Flask
-    # É onde ficam CSS, JS e imagens estáticas (incluindo as fotos principais do convite e do local).
     STATIC_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static')
 
     # Configuração de tamanho máximo para uploads de arquivos em bytes (ex: 16 MB)
-    # Isso se aplica a todos os uploads de formulário no Flask.
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024 # 16 Megabytes
 
     # Duração máxima padrão de vídeo em segundos.
-    # Este é um valor de fallback; o valor configurado no painel admin (ConfigSetting) tem precedência.
     MAX_VIDEO_DURATION_SECONDS = 20 # 20 segundos para vídeos
+    
+    # --- Configurações do Google Cloud Storage ---
+    # Carregado do .env. Estes valores são cruciais para o deploy.
+    GCS_PROJECT_ID = os.environ.get('GCS_PROJECT_ID')
+    GCS_BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME')
+    # Nota: GOOGLE_APPLICATION_CREDENTIALS_JSON é lido diretamente do os.environ no app.py
