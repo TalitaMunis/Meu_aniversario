@@ -49,8 +49,9 @@ def create_app():
         return AdminUser.query.get(int(user_id))
     
     # --- Inicializa o cliente do Google Cloud Storage ---
-    # A variável de ambiente GOOGLE_APPLICATION_CREDENTIALS aponta para o arquivo JSON.
-    # O Render lida com isso automaticamente se o valor for o conteúdo do arquivo.
+    # O Render lida com isso automaticamente através da variável de ambiente GOOGLE_APPLICATION_CREDENTIALS.
+    # No entanto, a autenticação padrão do GCS funciona se GOOGLE_APPLICATION_CREDENTIALS não for um caminho de arquivo,
+    # então usaremos um bloco try/except para garantir compatibilidade com ambientes diferentes.
     gcs_client = None
     gcs_credentials_json_content = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 
@@ -70,12 +71,8 @@ def create_app():
     gcs_bucket = gcs_client.bucket(app.config['GCS_BUCKET_NAME'])
     
     with app.app_context():
-        # A pasta de uploads local agora é usada apenas para testes, mas garantimos que existe.
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img'), exist_ok=True)
-        # Manteremos a pasta de fotos do local para desenvolvimento local, mas o GCS será o principal.
         os.makedirs(os.path.join(app.config['STATIC_FOLDER'], 'img', 'venue_photos'), exist_ok=True)
-
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # --- Decorador de Autenticação Customizado para Admin ---
     def admin_required(f):
@@ -661,8 +658,10 @@ def create_app():
                     setting = ConfigSetting(key=key, value=value)
                     db.session.add(setting)
             
-            # ATENÇÃO: Nenhuma foto de local padrão é adicionada aqui, pois agora o GCS é usado.
-            # Você precisará usar o painel admin para fazer o upload da sua primeira foto do local.
+            if not VenuePhoto.query.first():
+                # A foto de placeholder agora precisa ser manualmente upada para o GCS
+                # ou você pode criar uma entrada no DB sem o arquivo no GCS e avisar o admin.
+                print("AVISO: Nenhuma foto de local padrão será criada. Use o painel admin para fazer o upload.")
 
             db.session.commit()
             flash('Setup inicial de banco de dados e admin concluído!', 'success')
