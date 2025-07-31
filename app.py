@@ -749,7 +749,10 @@ def create_app():
 
     return app # Retorna a instância do aplicativo configurado
 
-# --- EXECUÇÃO DO APLICATIVO (Entry Point) ---
+# --- EXECUÇÃO DO APLICATIVO (Entry Point para Gunicorn e Local) ---
+# O Gunicorn encontrará o objeto 'app' neste nível.
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app() # Chama a função de fábrica para criar e configurar o app
-    app.run() # Inicia o servidor Flask em modo debug
+    # Este bloco só é executado quando o arquivo é rodado diretamente (desenvolvimento local)
+    app.run(debug=True)
