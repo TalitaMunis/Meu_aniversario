@@ -670,14 +670,17 @@ def create_app():
     @app.route("/add_sample_guests")
     def add_sample_guests():
         with app.app_context():
+        # Adiciona convidados de exemplo apenas se o DB estiver vazio de Guests
             if Guest.query.count() == 0: 
                 guest1 = Guest(group_name='Família Silva', party_type='talita_joaquim', unique_token=secrets.token_urlsafe(16))
                 guest2 = Guest(group_name='Amigos da Talita', party_type='talita_29_08', unique_token=secrets.token_urlsafe(16))
                 guest3 = Guest(group_name='Família Santos', party_type='talita_joaquim', unique_token=secrets.token_urlsafe(16))
 
+            # Adicionamos os Guests na sessão e comitamos para que eles tenham IDs.
                 db.session.add_all([guest1, guest2, guest3])
                 db.session.commit()
 
+            # Agora, podemos associar os membros usando os IDs que acabamos de criar.
                 member1_1 = GuestMember(guest_id=guest1.id, name='João Silva', is_plus_one=False)
                 member1_2 = GuestMember(guest_id=guest1.id, name='Maria Silva', is_plus_one=False)
                 member1_3 = GuestMember(guest_id=guest1.id, name='Pedrinho Silva', is_plus_one=False)
@@ -691,6 +694,7 @@ def create_app():
                 member3_2 = GuestMember(guest_id=guest3.id, name='Carla Santos', is_plus_one=False)
                 db.session.add_all([member3_1, member3_2])
 
+            # Cria um registro de Confirmação para cada Guest recém-criado
                 db.session.add(Confirmation(guest_id=guest1.id, timestamp=datetime.utcnow()))
                 db.session.add(Confirmation(guest_id=guest2.id, timestamp=datetime.utcnow()))
                 db.session.add(Confirmation(guest_id=guest3.id, timestamp=datetime.utcnow()))
@@ -699,12 +703,12 @@ def create_app():
                 flash('Convidados de exemplo adicionados com sucesso!', 'success')
             else:
                 flash('Convidados de exemplo já existem no banco de dados. Não foram adicionados novos.', 'info')
-            
+        
             guests_for_links = Guest.query.all()
             guest_links_html = []
             for guest in guests_for_links:
                 guest_links_html.append(f"<li><a href='{url_for('confirm_presence', token=guest.unique_token, _external=True)}'>{guest.group_name} (Festa: {guest.party_type})</a></li>")
-            
+        
             flash(f'Links gerados para convidados de teste: <ul>{"".join(guest_links_html)}</ul>', 'info')
 
         return redirect(url_for('home'))
